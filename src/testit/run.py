@@ -54,6 +54,9 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
         rich.print("Please run the 'setup' command first.")
         exit(1)
 
+    report_dir = data["report"]["dir"]
+    os.makedirs(report_dir, exist_ok=True)
+
     if not os.path.exists(f"{current_directory}/testit_golden.py"):
         rich.print("[bold red]ERROR: testit_golden.py not found![/bold red]")
         rich.print("Please run the 'setup' command first.")
@@ -344,8 +347,6 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
             testEnv.stop_deb()
 
         # Output the time duration of the tests
-        report_dir = data["report"]["dir"]
-        os.makedirs(report_dir, exist_ok=True)
         json_path = os.path.join(report_dir, "test_durations.json")
         with open(json_path, "w") as f:
             json.dump(test_duration_report, f, indent=2)
