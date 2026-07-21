@@ -45,31 +45,30 @@ def _load_config():
         return hjson.load(file)
 
 
-# Checks if required targets exist in the target project Makefile
-def _makefile_target_check():
-    make_sanity_check = __makefile_has_target("deb-setup")
-    make_sanity_check &= __makefile_has_target("sw-sim") & __makefile_has_target(
-        "sw-fpga"
-    )
-    make_sanity_check &= __makefile_has_target("sim-build") & __makefile_has_target(
-        "sim-run"
-    )
-    make_sanity_check &= __makefile_has_target("fpga-build") & __makefile_has_target(
-        "fpga-load"
-    )
-    return make_sanity_check
+# Checks if the targets required by the selected workflow exist in the project Makefile
+def _makefile_target_check(target_type):
+    required_targets = {
+        "sim": {"sim-build", "sw-sim", "sim-run"},
+        "fpga": {
+            "fpga-build",
+            "fpga-load",
+            "sw-fpga",
+            "deb-setup",
+            "gdb-setup",
+        },
+    }
+
+    if target_type not in required_targets:
+        return False
+
+    makefile_targets = set(__extract_makefile_targets())
+    return required_targets[target_type].issubset(makefile_targets)
 
 
 # Copies a file from the package directory to the current working directory
 def _copy_package_file(filename):
     resource_path = resources.files("testit") / filename
     shutil.copy(resource_path, os.getcwd())
-
-
-# Checks if a specific target exists in the target project Makefile
-def __makefile_has_target(target):
-    targets = __extract_makefile_targets()
-    return target in targets
 
 
 # Extracts all top-level targets from a Makefile.
@@ -104,6 +103,35 @@ def _configuration_check(configuration, sweep_mode):
     ):
         rich.print("   [bold red]ERROR: invalid usbPort and/or baudrate![/bold red]")
         return False
+
+    for test in configuration.get("tests", []):
+        output_mode = test.get("outputMode", "default")
+        if output_mode not in ("default", "custom"):
+            rich.print(
+                "   [bold red]ERROR: unsupported outputMode "
+                f"'{output_mode}'![/bold red]"
+            )
+            rich.print("   outputMode must be either 'default' or 'custom'")
+            return False
+
+        if output_mode == "custom":
+            for dataset_field in ("inputDataset", "outputDataset"):
+                datasets = test.get(dataset_field, [])
+                if isinstance(datasets, dict):
+                    datasets = [datasets]
+
+                for dataset in datasets:
+                    extension = dataset.get("extension")
+                    if not isinstance(extension, str) or not extension.strip():
+                        rich.print(
+                            "   [bold red]ERROR: custom output mode requires an "
+                            "extension for every dataset![/bold red]"
+                        )
+                        rich.print(
+                            "   Dataset "
+                            f"'{dataset.get('name', '<unnamed>')}' has no extension"
+                        )
+                        return False
 
     if sweep_mode:
         for test in configuration["tests"]:

@@ -71,16 +71,19 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
         )
         rich.print("[cyan]Bringing salted water to boil...[/cyan]")
 
-    # Check the presence of the required Makefile targets
-    if not run_util._makefile_target_check():
+    # Check the configuration before selecting the workflow-specific Makefile targets
+    if not run_util._configuration_check(data, sweep_mode):
+        rich.print(
+            " - [bold red]ERROR: there is an issue with config.test critical parameters![/bold red]"
+        )
+        exit(1)
+    elif not run_util._makefile_target_check(data["target"]["type"]):
         rich.print(
             " - [bold red]ERROR: Target project Makefile check failed![/bold red]"
         )
-        rich.print("   Please ensure that the Makefile contains the required targets")
-        exit(1)
-    elif not run_util._configuration_check(data, sweep_mode):
         rich.print(
-            " - [bold red]ERROR: there is an issue with config.test critical parameters![/bold red]"
+            "   Please ensure that the Makefile contains the required "
+            f"{data['target']['type']} targets"
         )
         exit(1)
     else:
@@ -238,13 +241,22 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
             task_message = " - Cooking..."
 
         task = progress.add_task(task_message, total=test_iterations, start=False)
-        start = False
+        progress.start_task(task)
 
         test_counter = 0
 
         test_duration_report = {}
 
         for test_iteration in range(test_iterations):
+            progress.update(
+                task,
+                description=(
+                    f" - [cyan]{test_iteration + 1}/{test_iterations}: "
+                    "preparing datasets"
+                ),
+                refresh=True,
+            )
+
             if not testEnv.gen_datasets(sweep_mode, test_iteration):
                 rich.print(f" - [bold red]ERROR: Dataset generation failed![/bold red]")
                 exit(1)
@@ -255,6 +267,15 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
             test_duration_report[test_iteration] = []
 
             for test in data["tests"]:
+                progress.update(
+                    task,
+                    description=(
+                        f" - [cyan]{test_iteration + 1}/{test_iterations}: "
+                        f"{test['appName']}"
+                    ),
+                    refresh=True,
+                )
+
                 start_time = time.time()
 
                 # Re-setup debugger every 10 tests if using FPGA
@@ -295,17 +316,6 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
                     )
                     exit(1)
 
-                if not start:
-                    progress.start_task(task)
-                    start = True
-
-                progress.update(
-                    task,
-                    advance=1,
-                    description=f" - [cyan]{test_iteration + 1}/{test_iterations}: {test['appName']}",
-                    refresh=True,
-                )
-
                 if sweep_mode:
                     test["currentIteration"] += 1
                     if test["currentIteration"] == test["totIterations"]:
@@ -326,6 +336,9 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
 
             if update_list_of_tests:
                 data["tests"] = new_data
+
+            # Advance once per complete iteration so the ETA is iteration-based.
+            progress.update(task, advance=1, refresh=True)
 
         if data["target"]["type"] == "fpga":
             testEnv.stop_deb()

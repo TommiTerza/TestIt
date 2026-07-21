@@ -69,6 +69,13 @@ def write_array(f, array, shape, indent=2):
     f.write("\n" + " " * indent)
 
 
+def write_string_array(path, array):
+    """Write a flattened array as one ASCII value per line."""
+    with path.open("w", encoding="ascii") as output:
+        for element in np.asarray(array).flatten():
+            output.write(f"{element}\n")
+
+
 def _load_database(results_dir):
     """Loads the test results database from the specified directory.
 

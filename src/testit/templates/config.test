@@ -12,10 +12,11 @@
     dir: "path/to/report/folder"
   }
   
-  test: [
+  tests: [
     {
       appName: "application_name"
       dir: "path/to/app"
+      outputMode: "default"
       genFilesName: "test_data"
       outputFormat: "(\\d+):(\\d+):(\\d+)" 
       outputTags: ["TestID", "Cycles", "Outcome"]
