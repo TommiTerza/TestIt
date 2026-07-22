@@ -70,6 +70,15 @@ class TestItEnv:
         """Clear the results of the last verification campaign."""
         testit_util.clear_database(self.cfg["report"]["dir"])
 
+    def seed_campaign(self):
+        """Seed the campaign random generators if a seed is configured."""
+        seed = self.cfg["target"].get("seed")
+        if seed is None:
+            return
+
+        random.seed(seed)
+        np.random.seed(seed)
+
     def build_model(self):
         """Build the model for the target application.
 

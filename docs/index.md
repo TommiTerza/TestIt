@@ -128,6 +128,7 @@ Specifically, there are three fields that you need to fill out:
     baudrate: 9600
     iterations: 10
     outputFile: "path/to/sim/dump"
+    seed: None
   }
   ```
   This field captures all the details about the target platform you are using, which can be any FPGA development board or simulation tool that *your workflow* supports.
@@ -143,6 +144,8 @@ Specifically, there are three fields that you need to fill out:
   - __*iterations*__: This is a key parameter. By default, TestIt repeats the defined tests for the number of iterations specified with this parameter. In each iteration, the tool selects random parameters (if available) and generates a corresponding input dataset and reference values. Note that this value can be overridden when using [sweep mode](#sweep-mode).
 
   - __*outputFile*__: This parameter may seem a bit tricky. TestIt reads test results via serial communication between the host device and the system under test (SUT). This method is used even for simulation-based tests. Essentially, your simulation system needs to dump the serial communication data to a file, and TestIt then reads and parses this file to extract the test information. The _outputFile_ parameter specifies the directory containing this file.
+
+  - __*seed*__: Set this to an integer to reproduce the same random parameters and datasets across multiple testing campaigns. Leave it as `None` or `null` to keep the campaign unseeded.
 
 - <a id="report-dir"> **report**</a>
   ```json

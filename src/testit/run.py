@@ -209,6 +209,8 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
     else:
         rich.print("[cyan]\nThrowing in the pasta...[/cyan]")
 
+    testEnv.seed_campaign()
+
     with Progress(
         TextColumn("[bold cyan]{task.description}"),
         BarColumn(),

@@ -26,6 +26,8 @@ import rich
 # Set this to True to enable debugging prints
 DEBUG_MODE = False  # TODO: REMOVE THIS LINE BEFORE RELEASE
 
+_MAX_NUMPY_SEED = 2**32 - 1
+
 
 # Redefine print() to be enabled only during debugging
 def _PRINT(*args, **kwargs):
@@ -91,10 +93,41 @@ def _update_time_estimation(progress, task_id):
         time.sleep(0.2)  # Adjust this to control the update frequency
 
 
+def _normalize_campaign_seed(seed):
+    if seed is None:
+        return None
+
+    if isinstance(seed, str):
+        stripped_seed = seed.strip()
+        if stripped_seed.lower() in ("", "none", "null"):
+            return None
+        try:
+            seed = int(stripped_seed, 0)
+        except ValueError as exc:
+            raise ValueError("seed must be None/null or an integer") from exc
+
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("seed must be None/null or an integer")
+
+    if seed < 0 or seed > _MAX_NUMPY_SEED:
+        raise ValueError(f"seed must be between 0 and {_MAX_NUMPY_SEED}")
+
+    return seed
+
+
 def _configuration_check(configuration, sweep_mode):
     if configuration["target"]["type"] not in ["sim", "fpga"]:
         rich.print("   [bold red]ERROR: Invalid target type![/bold red]")
         rich.print(f"   {configuration['target']['type']} is neither 'sim' nor 'fpga'")
+        return False
+
+    try:
+        configuration["target"]["seed"] = _normalize_campaign_seed(
+            configuration["target"].get("seed")
+        )
+    except ValueError as exc:
+        rich.print("   [bold red]ERROR: Invalid campaign seed![/bold red]")
+        rich.print(f"   {exc}")
         return False
 
     if configuration["target"]["type"] == "fpga" and (
