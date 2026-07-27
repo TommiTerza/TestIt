@@ -1,5 +1,9 @@
 import random
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -38,6 +42,48 @@ class CampaignSeedTests(unittest.TestCase):
 
         self.assertEqual(first_random_value, second_random_value)
         self.assertEqual(first_numpy_values, second_numpy_values)
+
+    def test_sim_run_receives_target_name(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = Path(tmpdir) / "sim.out"
+            output_file.write_text("1:2:3\n", encoding="utf-8")
+
+            env = TestItEnv(
+                {
+                    "target": {
+                        "type": "sim",
+                        "name": "verilator",
+                        "outputFile": str(output_file),
+                    },
+                    "report": {"dir": tmpdir},
+                }
+            )
+
+            completed = subprocess.CompletedProcess(
+                args="make",
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+            with mock.patch(
+                "testit.testit.subprocess.run", return_value=completed
+            ) as run_mock:
+                result = env.launch_test(
+                    app_name="demo",
+                    iteration=0,
+                    pattern=r"(\d+):(\d+):(\d+)",
+                    output_tags=["ID", "Cycles", "Outcome"],
+                )
+
+            self.assertTrue(result)
+            self.assertEqual(
+                [call.args[0] for call in run_mock.call_args_list],
+                [
+                    "make sw-sim tool=verilator app=demo",
+                    "make sim-run tool=verilator app=demo",
+                ],
+            )
 
 
 if __name__ == "__main__":

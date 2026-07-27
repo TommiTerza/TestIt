@@ -104,7 +104,7 @@ TestIt delegates project-specific build and execution steps to a `Makefile` in t
 | --- | --- | --- |
 | `make sim-build tool=<target.name>` | Simulation | Build the simulation model for the selected tool. This is skipped with `testit run --nobuild`. |
 | `make sw-sim tool=<target.name> app=<test.appName>` | Simulation | Compile the selected test application for simulation. |
-| `make sim-run app=<test.appName>` | Simulation | Run the compiled application and write its output to the file configured by `target.outputFile`. |
+| `make sim-run tool=<target.name> app=<test.appName>` | Simulation | Run the compiled application and write its output to the file configured by `target.outputFile`. |
 | `make fpga-build board=<target.name>` | FPGA | Build the FPGA model for the selected board. This is skipped with `testit run --nobuild`. |
 | `make fpga-load board=<target.name>` | FPGA | Load the built model onto the selected FPGA board. |
 | `make sw-fpga app=<test.appName> target=<target.name>` | FPGA | Compile the selected test application for the target board. |

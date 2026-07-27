@@ -321,7 +321,7 @@ class TestItEnv:
             print_deb("Compilation successful!")
 
             # Launch the simulation test
-            sim_cmd = f"make sim-run app={app_name}"
+            sim_cmd = f"make sim-run tool={self.cfg['target']['name']} app={app_name}"
             result_sim = subprocess.run(
                 sim_cmd, shell=True, capture_output=True, text=True, check=False
             )
