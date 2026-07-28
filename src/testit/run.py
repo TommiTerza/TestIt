@@ -43,6 +43,35 @@ from rich.progress import (
 from rich.status import Status
 
 
+def _launch_test_error_message(result, app_name, data):
+    """Build the user-facing error for a launch_test result code."""
+    messages = {
+        testit.LaunchTestResult.FPGA_SERIAL_PORT_NOT_OPEN: (
+            f"Test {app_name} failed because the FPGA serial port is not open"
+        ),
+        testit.LaunchTestResult.FPGA_COMPILATION_FAILED: (
+            f"Test {app_name} failed during FPGA application compilation; "
+            "see testit_crash.log"
+        ),
+        testit.LaunchTestResult.FPGA_GDB_LOAD_TIMEOUT: (
+            f"Test {app_name} failed because GDB timed out while loading the "
+            "FPGA application"
+        ),
+        testit.LaunchTestResult.SIM_COMPILATION_FAILED: (
+            f"Test {app_name} failed during simulation application compilation; "
+            "see testit_crash.log"
+        ),
+        testit.LaunchTestResult.SIM_RUN_FAILED: (
+            f"Test {app_name} failed during simulation run; see testit_crash.log"
+        ),
+        testit.LaunchTestResult.SIM_OUTPUT_FILE_MISSING: (
+            f"Test {app_name} failed because simulation output file "
+            f"{data['target'].get('outputFile', '<missing>')} was not found"
+        ),
+    }
+    return messages.get(result, f"Test {app_name} failed with unknown launch result")
+
+
 def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
 
     current_directory = os.getcwd()
@@ -309,17 +338,22 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
                 else:
                     test_counter += 1
 
-                if not testEnv.launch_test(
+                launch_result = testEnv.launch_test(
                     app_name=test["appName"],
                     iteration=test_iteration,
                     pattern=rf"{test['outputFormat']}",
                     output_tags=test["outputTags"],
                     timeout_t=1000,
-                ):
-                    rich.print(
-                        f" - [bold red]ERROR: Test {test['appName']} failed because of GDB timeout[/bold red]"
+                )
+                if launch_result != testit.LaunchTestResult.SUCCESS:
+                    error_message = _launch_test_error_message(
+                        launch_result, test["appName"], data
                     )
-                    exit(1)
+                    rich.print(
+                        f" - [bold red]ERROR code {int(launch_result)}: "
+                        f"{error_message}[/bold red]"
+                    )
+                    exit(int(launch_result))
 
                 if sweep_mode:
                     test["currentIteration"] += 1

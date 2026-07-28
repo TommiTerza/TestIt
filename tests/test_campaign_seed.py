@@ -7,8 +7,9 @@ from unittest import mock
 
 import numpy as np
 
+from testit import run as run_module
 from testit import run_util
-from testit.testit import TestItEnv
+from testit.testit import LaunchTestResult, TestItEnv
 
 
 class CampaignSeedTests(unittest.TestCase):
@@ -76,7 +77,7 @@ class CampaignSeedTests(unittest.TestCase):
                     output_tags=["ID", "Cycles", "Outcome"],
                 )
 
-            self.assertTrue(result)
+            self.assertEqual(result, LaunchTestResult.SUCCESS)
             self.assertEqual(
                 [call.args[0] for call in run_mock.call_args_list],
                 [
@@ -84,6 +85,124 @@ class CampaignSeedTests(unittest.TestCase):
                     "make sim-run tool=verilator app=demo",
                 ],
             )
+
+    def test_sim_compile_failure_returns_specific_code(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = TestItEnv(
+                {
+                    "target": {
+                        "type": "sim",
+                        "name": "verilator",
+                        "outputFile": str(Path(tmpdir) / "sim.out"),
+                    },
+                    "report": {"dir": tmpdir},
+                }
+            )
+
+            failed_compile = subprocess.CompletedProcess(
+                args="make",
+                returncode=2,
+                stdout="compile failed",
+                stderr="",
+            )
+
+            with mock.patch(
+                "testit.testit.subprocess.run", return_value=failed_compile
+            ), mock.patch("builtins.open", mock.mock_open()):
+                result = env.launch_test(
+                    app_name="demo",
+                    iteration=0,
+                    pattern=r"(\d+):(\d+):(\d+)",
+                    output_tags=["ID", "Cycles", "Outcome"],
+                )
+
+            self.assertEqual(result, LaunchTestResult.SIM_COMPILATION_FAILED)
+
+    def test_sim_run_failure_returns_specific_code(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = TestItEnv(
+                {
+                    "target": {
+                        "type": "sim",
+                        "name": "verilator",
+                        "outputFile": str(Path(tmpdir) / "sim.out"),
+                    },
+                    "report": {"dir": tmpdir},
+                }
+            )
+
+            completed = subprocess.CompletedProcess(
+                args="make",
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+            failed_run = subprocess.CompletedProcess(
+                args="make",
+                returncode=1,
+                stdout="run failed",
+                stderr="",
+            )
+
+            with mock.patch(
+                "testit.testit.subprocess.run",
+                side_effect=[completed, failed_run],
+            ), mock.patch("builtins.open", mock.mock_open()):
+                result = env.launch_test(
+                    app_name="demo",
+                    iteration=0,
+                    pattern=r"(\d+):(\d+):(\d+)",
+                    output_tags=["ID", "Cycles", "Outcome"],
+                )
+
+            self.assertEqual(result, LaunchTestResult.SIM_RUN_FAILED)
+
+    def test_missing_sim_output_returns_specific_code(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = TestItEnv(
+                {
+                    "target": {
+                        "type": "sim",
+                        "name": "verilator",
+                        "outputFile": str(Path(tmpdir) / "missing.out"),
+                    },
+                    "report": {"dir": tmpdir},
+                }
+            )
+
+            completed = subprocess.CompletedProcess(
+                args="make",
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+            with mock.patch(
+                "testit.testit.subprocess.run",
+                side_effect=[completed, completed],
+            ):
+                result = env.launch_test(
+                    app_name="demo",
+                    iteration=0,
+                    pattern=r"(\d+):(\d+):(\d+)",
+                    output_tags=["ID", "Cycles", "Outcome"],
+                )
+
+            self.assertEqual(result, LaunchTestResult.SIM_OUTPUT_FILE_MISSING)
+
+    def test_launch_test_error_messages_are_specific(self):
+        data = {"target": {"outputFile": "sim.out"}}
+
+        sim_message = run_module._launch_test_error_message(
+            LaunchTestResult.SIM_RUN_FAILED, "demo", data
+        )
+        fpga_message = run_module._launch_test_error_message(
+            LaunchTestResult.FPGA_GDB_LOAD_TIMEOUT, "demo", data
+        )
+
+        self.assertIn("simulation run", sim_message)
+        self.assertNotIn("GDB timeout", sim_message)
+        self.assertIn("GDB timed out", fpga_message)
 
 
 if __name__ == "__main__":

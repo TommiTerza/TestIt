@@ -22,6 +22,7 @@ import random
 import re
 import subprocess
 import threading
+from enum import IntEnum
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +36,18 @@ from . import testit_util
 # Set this to True to enable debugging prints
 # TODO: REMOVE BEFORE RELEASE
 DEBUG_MODE = False
+
+
+class LaunchTestResult(IntEnum):
+    """Result codes returned by TestItEnv.launch_test."""
+
+    SUCCESS = 0
+    FPGA_SERIAL_PORT_NOT_OPEN = 10
+    FPGA_COMPILATION_FAILED = 11
+    FPGA_GDB_LOAD_TIMEOUT = 12
+    SIM_COMPILATION_FAILED = 20
+    SIM_RUN_FAILED = 21
+    SIM_OUTPUT_FILE_MISSING = 22
 
 
 # TODO: REMOVE BEFORE RELEASE
@@ -218,7 +231,8 @@ class TestItEnv:
             timeout_t (int, optional): The timeout for the test. Defaults to 0.
 
         Returns:
-            bool: True if the test was successful, False otherwise.
+            LaunchTestResult: SUCCESS if the test was successful, a target-specific
+            error code otherwise.
         """
         if output_tags is None:
             output_tags = ["ID", "Cycles", "Outcome"]
@@ -228,7 +242,7 @@ class TestItEnv:
             # Check that the serial connection is still open
             if not self.serial_comm_instance.is_open:
                 print("ERROR: Serial port is not open!")
-                exit(1)
+                return LaunchTestResult.FPGA_SERIAL_PORT_NOT_OPEN
             self.serial_comm_thread = threading.Thread(
                 target=testit_util.serial_rx_setup,
                 args=(self.serial_comm_instance, self.serial_comm_queue),
@@ -255,7 +269,7 @@ class TestItEnv:
                 with open("testit_crash.log", "w", encoding="utf-8") as file:
                     file.write(result_compilation.stdout)
                     file.write(result_compilation.stderr)
-                return False
+                return LaunchTestResult.FPGA_COMPILATION_FAILED
             else:
                 print_deb("Compilation successful!")
 
@@ -273,7 +287,7 @@ class TestItEnv:
             except pexpect.TIMEOUT:
                 print_deb("No new output from GDB.")
                 self.gdb.terminate()
-                return False
+                return LaunchTestResult.FPGA_GDB_LOAD_TIMEOUT
 
             # Set a breakpoint at the exit and wait for it
             self.gdb.sendline("b _exit")
@@ -325,7 +339,7 @@ class TestItEnv:
                     file.write("\nSTDERR:\n")
                     file.write(result_compilation.stderr)
 
-                return False
+                return LaunchTestResult.SIM_COMPILATION_FAILED
 
             print_deb("Compilation successful!")
 
@@ -353,7 +367,7 @@ class TestItEnv:
                     file.write("\nSTDERR:\n")
                     file.write(result_sim.stderr)
 
-                return False
+                return LaunchTestResult.SIM_RUN_FAILED
 
             print_deb("Simulation successful!")
 
@@ -366,7 +380,7 @@ class TestItEnv:
                 ) as file:
                     output_lines = file.readlines()
             except FileNotFoundError:
-                return False
+                return LaunchTestResult.SIM_OUTPUT_FILE_MISSING
 
         print_deb("Output lines:", output_lines)
 
@@ -386,7 +400,7 @@ class TestItEnv:
         testit_util.append_results_to_report(
             self.cfg["report"]["dir"], app_name, iteration, output_matches
         )
-        return True
+        return LaunchTestResult.SUCCESS
 
     # Generate a report of the last verification campaign.
     def gen_report(self, sort_key=None, ascending=True):
