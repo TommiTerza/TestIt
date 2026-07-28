@@ -302,49 +302,69 @@ class TestItEnv:
         # Test using the simulation tool
         else:
             # Compile the application
-            app_compile_cmd = f"make sw-sim tool={self.cfg['target']['name']} app={app_name}"
-            result_compilation = subprocess.run(app_compile_cmd, shell=True, capture_output=True, text=True)
+            app_compile_cmd = (
+                f"make sw-sim tool={self.cfg['target']['name']} app={app_name}"
+            )
 
-            if (
-                ("ERROR" in result_compilation.stdout)
-                or ("Error" in result_compilation.stdout)
-                or ("error" in result_compilation.stdout)
-                or ("ERROR" in result_compilation.stderr)
-                or ("Error" in result_compilation.stderr)
-                or ("error" in result_compilation.stderr)
-            ):
-                with open("testit_crash.log", "w") as file:
+            result_compilation = subprocess.run(
+                app_compile_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result_compilation.returncode != 0:
+                with open("testit_crash.log", "w", encoding="utf-8") as file:
+                    file.write(
+                        f"Compilation command failed with exit code "
+                        f"{result_compilation.returncode}\n\n"
+                    )
+                    file.write("STDOUT:\n")
                     file.write(result_compilation.stdout)
+                    file.write("\nSTDERR:\n")
                     file.write(result_compilation.stderr)
+
                 return False
 
             print_deb("Compilation successful!")
 
             # Launch the simulation test
-            sim_cmd = f"make sim-run tool={self.cfg['target']['name']} app={app_name}"
-            result_sim = subprocess.run(
-                sim_cmd, shell=True, capture_output=True, text=True, check=False
+            sim_cmd = (
+                f"make sim-run tool={self.cfg['target']['name']} app={app_name}"
             )
 
-            if (
-                ("ERROR" in result_sim.stdout)
-                or ("Error" in result_sim.stdout)
-                or ("error" in result_sim.stdout)
-                or ("ERROR" in result_sim.stderr)
-                or ("Error" in result_sim.stderr)
-                or ("error" in result_sim.stderr)
-            ):
-                with open("testit_crash.log", "w") as file:
+            result_sim = subprocess.run(
+                sim_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result_sim.returncode != 0:
+                with open("testit_crash.log", "w", encoding="utf-8") as file:
+                    file.write(
+                        f"Simulation command failed with exit code "
+                        f"{result_sim.returncode}\n\n"
+                    )
+                    file.write("STDOUT:\n")
                     file.write(result_sim.stdout)
+                    file.write("\nSTDERR:\n")
                     file.write(result_sim.stderr)
+
                 return False
 
             print_deb("Simulation successful!")
 
             # Read the output file
             try:
-                with open(self.cfg["target"]["outputFile"], "r", encoding="utf-8") as f:
-                    output_lines = f.readlines()
+                with open(
+                    self.cfg["target"]["outputFile"],
+                    "r",
+                    encoding="utf-8",
+                ) as file:
+                    output_lines = file.readlines()
             except FileNotFoundError:
                 return False
 
