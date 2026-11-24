@@ -16,8 +16,8 @@ TestIt tackles these limitations and aims at **bridging the gap** between **form
 
 #### How can TestIt do all of this? 
 With just three requirements:
-- A simple **configuration file**, `config.test`, in which you have to describe both *your workflow* and the *tests* you want to run.
-- A **python module**, `testit_golden.py`, in which you can develop the *golden functions* used to generate the reference values for your test.
+- A simple **configuration file**, `testit/config/config.test` by default, in which you have to describe both *your workflow* and the *tests* you want to run.
+- A **python module**, `testit/testit_golden.py`, in which you can develop the *golden functions* used to generate the reference values for your test.
 - A complete **Makefile-based workflow**, with the [required Make targets](#makefile-targets). This is the *gateway* that TestIt uses to access your workflow to build, compile and load.
 
 #### How can you use TestIt?
@@ -371,9 +371,18 @@ TestIt provides three main commands to access its functionalities.
 ```bash
 testit setup
 ```  
-This is the first command you’ll want to run. It does exactly what it says—it sets up your TestIt environment. Running this command generates template versions of *testit_golden.py* and *config.test*, based on the targets and examples in this documentation.  
+This is the first command you’ll want to run. It does exactly what it says—it sets up your TestIt environment. Running this command creates a `testit/` directory with template versions of the golden module and of the default configuration, based on the targets and examples in this documentation:
 
-You don’t have to place these files in the root of your RTL project, but keep in mind that **all subsequent TestIt commands must be executed in the same directory where you first ran** `testit setup`. That’s where TestIt expects to find its configuration files.  
+```text
+testit/
+├── testit_golden.py
+└── config/
+    └── config.test
+```
+
+Existing files are never overwritten. You can add more configuration files next to `config.test` in `testit/config/` and select them with the `--config` [flag](#run-the-testing-campaign).
+
+You don’t have to run this in the root of your RTL project, but keep in mind that **all subsequent TestIt commands must be executed in the directory that contains** `testit/`. That’s where TestIt expects to find its configuration files.  
 
 ---
 
@@ -381,7 +390,7 @@ You don’t have to place these files in the root of your RTL project, but keep 
 ```bash
 testit run [flags]
 ```  
-This is the core command of TestIt, the one that actually executes the testing campaign. As mentioned earlier, you must run it in the directory where *testit_golden.py* and *config.test* are stored, which doesn’t necessarily have to be the root of your RTL project.  
+This is the core command of TestIt, the one that actually executes the testing campaign. As mentioned earlier, you must run it in the directory that contains `testit/`, which doesn’t necessarily have to be the root of your RTL project.  
 
 The progress bar estimates the remaining campaign time from the duration of completed iterations. An iteration advances the progress only after all of its configured tests finish, so the estimate does not depend on the number of tests in that iteration.
 
@@ -396,6 +405,11 @@ If you have already built your simulation or FPGA model and want to skip the bui
 testit run --sweep
 ```  
 This enables <a id="sweep-mode">**sweep mode**</a>, which overrides the _iterations_ parameter and instead tests all possible parameter combinations for each individual test. This mode ensures a more comprehensive testing effort and is particularly useful for **performance characterization**. Be aware that this may generate a _large number of iterations_. The command line interface will always display the current iteration count and provide a dynamic estimate of the total test duration.  
+
+```bash
+testit run --config [file_name]
+```  
+Runs the campaign described by `testit/config/[file_name]` instead of the default `testit/config/config.test`. The same flag is accepted by `testit report`, so the report is read from the directory that configuration specifies.
 
 ```bash
 testit run --mammamia

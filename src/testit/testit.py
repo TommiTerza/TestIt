@@ -506,7 +506,7 @@ class TestItEnv:
 
                 parameters = test.get("parameters", [])
                 if sweep_mode:
-                    sweep_parameters = testit_util._get_sweep_parameters(
+                    sweep_parameters = testit_util.get_sweep_parameters(
                         test_iteration, parameters
                     )
 

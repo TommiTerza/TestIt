@@ -21,8 +21,8 @@ TestIt tackles these limitations and to **bridge the gap** between **formal veri
 
 #### How can TestIt do all of this? 
 With just three requirements:
-- A simple **configuration file**, `config.test`, in which you have to describe both *your workflow* and the *tests* you want to run.
-- A **python module**, `testit_golden.py`, in which you can develop the *golden functions* used to generate the reference values for your test.
+- A simple **configuration file**, `testit/config/config.test` by default, in which you have to describe both *your workflow* and the *tests* you want to run.
+- A **python module**, `testit/testit_golden.py`, in which you can develop the *golden functions* used to generate the reference values for your test.
 - A complete **Makefile-based workflow**, with the [required Make targets](docs/index.md#makefile-targets). This is the *gateway* that TestIt uses to access your workflow to build, compile and load.
 
 #### How can you use TestIt?

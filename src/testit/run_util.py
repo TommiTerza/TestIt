@@ -23,6 +23,8 @@ import subprocess
 import threading
 import rich
 
+from . import testit_util
+
 # Set this to True to enable debugging prints
 DEBUG_MODE = False  # TODO: REMOVE THIS LINE BEFORE RELEASE
 
@@ -35,12 +37,11 @@ def _PRINT(*args, **kwargs):
         print(*args, **kwargs)
 
 
-# Parses config.test as an HJSON from the current working directory
-def _load_config():
-    config_path = os.path.join(os.getcwd(), "config.test")
+# Parses a configuration file from testit/config/ as HJSON; returns None if it is missing
+def _load_config(config_name):
+    config_path = testit_util.config_path(config_name)
 
     if not os.path.exists(config_path):
-        print("ERROR: config.test not found in the current directory.")
         return None
 
     with open(config_path, "r") as file:
@@ -67,10 +68,10 @@ def _makefile_target_check(target_type):
     return required_targets[target_type].issubset(makefile_targets)
 
 
-# Copies a file from the package directory to the current working directory
-def _copy_package_file(filename):
+# Copies a file from the package directory to the given destination path
+def _copy_package_file(filename, destination):
     resource_path = resources.files("testit") / filename
-    shutil.copy(resource_path, os.getcwd())
+    shutil.copy(resource_path, destination)
 
 
 # Extracts all top-level targets from a Makefile.

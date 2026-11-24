@@ -9,6 +9,7 @@ import numpy as np
 
 from testit import run as run_module
 from testit import run_util
+from testit import testit_util
 from testit.testit import LaunchTestResult, TestItEnv
 
 
@@ -203,6 +204,64 @@ class CampaignSeedTests(unittest.TestCase):
         self.assertIn("simulation run", sim_message)
         self.assertNotIn("GDB timeout", sim_message)
         self.assertIn("GDB timed out", fpga_message)
+
+    def test_sweep_parameters_cover_all_combinations(self):
+        parameters = [
+            {"name": "ROWS", "value": [2, 4], "step": 1},
+            {"name": "COLS", "value": [8, 4], "step": 2},
+            {"name": "MODE", "value": "fast"},
+        ]
+
+        self.assertEqual(
+            [
+                testit_util.get_sweep_parameters(iteration, parameters)
+                for iteration in range(9)
+            ],
+            [
+                [2, 8, "fast"],
+                [3, 8, "fast"],
+                [4, 8, "fast"],
+                [2, 6, "fast"],
+                [3, 6, "fast"],
+                [4, 6, "fast"],
+                [2, 4, "fast"],
+                [3, 4, "fast"],
+                [4, 4, "fast"],
+            ],
+        )
+
+    def test_sweep_mode_dataset_generation_uses_sweep_parameters(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_dir = Path(tmpdir) / "app"
+            test_dir.mkdir()
+            env = TestItEnv(
+                {
+                    "target": {"type": "sim"},
+                    "report": {"dir": tmpdir},
+                    "tests": [
+                        {
+                            "appName": "demo",
+                            "dir": str(test_dir),
+                            "genFilesName": "test_data",
+                            "parameters": [
+                                {"name": "SIZE", "value": [2, 4], "step": 1},
+                            ],
+                            "inputDataset": [
+                                {
+                                    "name": "input_data",
+                                    "dataType": "uint8_t",
+                                    "valueRange": [0, 10],
+                                    "dimensions": ["SIZE"],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+
+            self.assertTrue(env.gen_datasets(sweep_mode=True, test_iteration=1))
+            header = (test_dir / "test_data.h").read_text(encoding="utf-8")
+            self.assertIn("#define SIZE 3", header)
 
 
 if __name__ == "__main__":

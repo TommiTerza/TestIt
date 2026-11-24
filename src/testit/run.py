@@ -24,6 +24,7 @@ from rich.progress import (
 from rich.status import Status
 import rich
 from . import testit
+from . import testit_util
 import os
 import threading
 import queue
@@ -72,22 +73,31 @@ def _launch_test_error_message(result, app_name, data):
     return messages.get(result, f"Test {app_name} failed with unknown launch result")
 
 
-def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
-
-    current_directory = os.getcwd()
-
-    # Load the configuration file
-    data = run_util._load_config()
+def _load_config_or_exit(config_name):
+    """Load the named configuration file, exiting with a hint if it is missing."""
+    data = run_util._load_config(config_name)
     if data is None:
-        rich.print("[bold red]ERROR: config.test not found![/bold red]")
+        missing_path = os.path.relpath(testit_util.config_path(config_name))
+        rich.print(f"[bold red]ERROR: {missing_path} not found![/bold red]")
         rich.print("Please run the 'setup' command first.")
         exit(1)
+    return data
+
+
+def testit_run(
+    no_build=False,
+    italian_mode=False,
+    sweep_mode=False,
+    config_name=testit_util.DEFAULT_CONFIG_NAME,
+):
+    data = _load_config_or_exit(config_name)
 
     report_dir = data["report"]["dir"]
     os.makedirs(report_dir, exist_ok=True)
 
-    if not os.path.exists(f"{current_directory}/testit_golden.py"):
-        rich.print("[bold red]ERROR: testit_golden.py not found![/bold red]")
+    if not os.path.exists(testit_util.golden_module_path()):
+        missing_path = os.path.relpath(testit_util.golden_module_path())
+        rich.print(f"[bold red]ERROR: {missing_path} not found![/bold red]")
         rich.print("Please run the 'setup' command first.")
         exit(1)
 
@@ -106,7 +116,7 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
     # Check the configuration before selecting the workflow-specific Makefile targets
     if not run_util._configuration_check(data, sweep_mode):
         rich.print(
-            " - [bold red]ERROR: there is an issue with config.test critical parameters![/bold red]"
+            f" - [bold red]ERROR: there is an issue with {config_name} critical parameters![/bold red]"
         )
         exit(1)
     elif not run_util._makefile_target_check(data["target"]["type"]):
@@ -121,7 +131,7 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
     else:
         if not italian_mode:
             rich.print(
-                " - Target project Makefile and config.test check [bold green][OK][/bold green]"
+                f" - Target project Makefile and {config_name} check [bold green][OK][/bold green]"
             )
         else:
             rich.print(" - Nonna's recipe [bold green][READ][/bold green]")
@@ -246,6 +256,9 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
         TimeRemainingColumn(),
         SpinnerColumn(),
         transient=True,
+        # One sweep iteration often outlasts rich's default 30 s window, which
+        # would leave a single sample and no ETA; average over the whole run.
+        speed_estimate_period=float("inf"),
     ) as progress:
 
         # Compute the total test iterations
@@ -313,7 +326,7 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
                 start_time = time.time()
 
                 # Re-setup debugger every 10 tests if using FPGA
-                if test_counter == 10 and data["target"]["type"] == "fpga":
+                if test_counter == 5 and data["target"]["type"] == "fpga":
                     test_counter = 0
                     testEnv.stop_gdb()
                     testEnv.stop_deb()
@@ -395,30 +408,34 @@ def testit_run(no_build=False, italian_mode=False, sweep_mode=False):
             rich.print("\n[bold green]A tavola![/bold green]")
 
 
-# If necessary, generates the necessary files for the TestIt package: testit_golden.py and config.test
-def testit_setup():
-    current_directory = os.getcwd()
-    if os.path.exists(f"{current_directory}/testit_golden.py"):
+def _generate_from_template(template, destination):
+    """Copy a package template to destination unless a file already exists there."""
+    relative_destination = os.path.relpath(destination)
+    if os.path.exists(destination):
         rich.print(
-            "[yellow]WARNING: 'testit_golden.py' already exists in the current directory.[/yellow]"
+            f"[yellow]WARNING: '{relative_destination}' already exists.[/yellow]"
         )
-    else:
-        run_util._copy_package_file("templates/testit_golden.py")
-        rich.print("Generation of 'testit_golden.py' [bold green][OK][/bold green]")
+        return
 
-    if os.path.exists(f"{current_directory}/config.test"):
-        rich.print(
-            "[yellow]WARNING: 'config.test' already exists in the current directory.[/yellow]"
-        )
-    else:
-        run_util._copy_package_file("templates/config.test")
-        rich.print("Generation of 'config.test' [bold green][OK][/bold green]")
+    run_util._copy_package_file(template, destination)
+    rich.print(f"Generation of '{relative_destination}' [bold green][OK][/bold green]")
+
+
+# Creates the testit/ project directory with a golden module and a default configuration
+def testit_setup():
+    os.makedirs(testit_util.CONFIG_DIR, exist_ok=True)
+    _generate_from_template(
+        "templates/testit_golden.py", testit_util.golden_module_path()
+    )
+    _generate_from_template(
+        "templates/config.test",
+        testit_util.config_path(testit_util.DEFAULT_CONFIG_NAME),
+    )
 
 
 # Generates a report of the last verification campaign
-def testit_report(sort_key, ascending):
-    # Load the configuration file
-    data = run_util._load_config()
+def testit_report(sort_key, ascending, config_name=testit_util.DEFAULT_CONFIG_NAME):
+    data = _load_config_or_exit(config_name)
 
     # Create the TestIt object
     testEnv = testit.TestItEnv(data)
